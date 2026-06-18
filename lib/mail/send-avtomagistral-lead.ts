@@ -70,6 +70,18 @@ function getSmtpConfig(): SmtpConfig {
 }
 
 function getSubject(formType: string) {
+  if (formType === 'cooperation') {
+    return 'Новая заявка: сотрудничество';
+  }
+
+  if (formType === 'callback') {
+    return 'Новая заявка: обратный звонок';
+  }
+
+  if (formType === 'order') {
+    return 'Новая заявка: заказ техники / перевозки';
+  }
+
   const normalized = formType.toLowerCase();
 
   if (normalized.includes('сотруд')) {

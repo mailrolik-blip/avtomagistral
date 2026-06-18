@@ -1,4 +1,4 @@
-# Автомагистраль 1.0
+# Автомагистраль 1.1
 
 Standalone Next.js-проект лендинга ООО «Автомагистраль» с серверным API заявок.
 
@@ -16,26 +16,39 @@ npm run dev
 Создайте `.env` по примеру `.env.example`.
 
 ```env
-AVTOMAGISTRAL_LEADS_WEBHOOK_URL=
-AVTOMAGISTRAL_LEADS_TO=
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
+AVTOMAGISTRAL_LEADS_WEBHOOK_URL=https://example.com/webhook
+AVTOMAGISTRAL_LEADS_TO=leads@example.com
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=user@example.com
+SMTP_PASS=change-me
+SMTP_FROM=noreply@example.com
 ```
 
-Основной способ доставки заявок - `AVTOMAGISTRAL_LEADS_WEBHOOK_URL` для Google Apps Script webhook. SMTP используется только как fallback, если webhook не задан и SMTP-переменные заполнены.
+Основной способ доставки заявок - `AVTOMAGISTRAL_LEADS_WEBHOOK_URL`. SMTP используется только как fallback, если webhook не задан и SMTP-переменные заполнены. Реальные секреты не коммитятся.
+
+## Заявки
+
+Frontend отправляет все формы в `/api/leads`.
+
+Поддерживаемые `formType`:
+
+- `order` - заказ техники / перевозки;
+- `cooperation` - сотрудничество;
+- `callback` - обратный звонок.
+
+API валидирует `name`, `phone`, `formType`. Для `order` также требуется выбранная услуга или описание задачи в комментарии. Ответы пользователю возвращают понятный JSON без stack trace и без раскрытия webhook URL.
 
 ## Структура
 
 - `app/page.tsx` - главная страница лендинга.
-- `app/api/leads/route.ts` - API приема заявок.
-- `components/` - UI лендинга.
-- `lib/mail/` - SMTP fallback.
+- `components/AvtomagistralLanding.tsx` - UI лендинга и формы.
+- `components/avtomagistral-landing.module.css` - стили лендинга.
+- `app/api/leads/route.ts` - API приёма заявок.
+- `lib/mail/send-avtomagistral-lead.ts` - SMTP fallback.
 - `public/` - изображения и брендовые ассеты.
 
-Проект не использует Prisma, auth Gorilla, кабинет, админку, игру, hockey components или данные Gorilla.
+Проект не использует Prisma, CRM, Tilda, Gorilla, DNK, админку или базу данных.
 
 ## Production Deploy
 
@@ -51,98 +64,23 @@ SMTP_FROM=
 3002
 ```
 
-### Установка
+Сервис: `avtomagistral.service`.
+
+## Проверки
 
 ```bash
-cd /var/www/avtomagistral
-npm ci
+npm run lint
+npx tsc --noEmit
 npm run build
 ```
 
-### Systemd
+Ручные проверки после деплоя:
 
-Сервис: `avtomagistral.service`.
-
-Пример `/etc/systemd/system/avtomagistral.service`:
-
-```ini
-[Unit]
-Description=Avtomagistral Next.js app
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/var/www/avtomagistral
-Environment=NODE_ENV=production
-EnvironmentFile=/var/www/avtomagistral/.env
-ExecStart=/usr/bin/npm run start
-Restart=always
-RestartSec=5
-User=www-data
-Group=www-data
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable avtomagistral.service
-sudo systemctl restart avtomagistral.service
-sudo systemctl status avtomagistral.service
-```
-
-### Nginx
-
-Домены:
-
-- `avtomagistral77.ru`
-- `www.avtomagistral77.ru`
-- `xn--77-6kcaaki4b2afv2amig7n.xn--p1ai`
-- `www.xn--77-6kcaaki4b2afv2amig7n.xn--p1ai`
-
-Пример server block:
-
-```nginx
-server {
-    listen 80;
-    server_name avtomagistral77.ru www.avtomagistral77.ru xn--77-6kcaaki4b2afv2amig7n.xn--p1ai www.xn--77-6kcaaki4b2afv2amig7n.xn--p1ai;
-
-    location / {
-        proxy_pass http://127.0.0.1:3002;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-После настройки DNS выпустить SSL через certbot:
-
-```bash
-sudo certbot --nginx -d avtomagistral77.ru -d www.avtomagistral77.ru -d xn--77-6kcaaki4b2afv2amig7n.xn--p1ai -d www.xn--77-6kcaaki4b2afv2amig7n.xn--p1ai
-```
-
-## Проверки после деплоя
-
-1. Главная страница открывается на основном домене.
-2. Алиас `.рф` открывается через punycode-домен.
-3. Все секции лендинга отображаются.
-4. Форма заказа техники отправляется.
-5. Форма сотрудничества отправляется.
-6. Форма обратного звонка отправляется.
-7. При ошибке webhook пользователь видит понятную ошибку.
-8. Webhook получает payload без раскрытия секретов клиенту.
-9. Логи сервиса не содержат критичных ошибок:
-
-```bash
-journalctl -u avtomagistral.service -f
-```
-
-## Развитие
-
-Текущая структура оставляет место для следующих модулей без переписывания ядра проекта: админка заявок, CRM, карточки техники, SEO-страницы услуг, города и направления, интеграции и личный кабинет.
+1. На главной странице видна одна основная форма, а не три большие формы подряд.
+2. Основная форма отправляет заявку с `formType: "order"`.
+3. Popup сотрудничества отправляет заявку с `formType: "cooperation"`.
+4. Popup обратного звонка отправляет заявку с `formType: "callback"`.
+5. `/api/leads` возвращает `{ "ok": true }` при рабочем webhook.
+6. При выключенном или битом webhook пользователь видит понятную ошибку.
+7. Логи содержат formType и статус доставки, но не содержат персональные данные целиком, пароли или полный webhook URL.
+8. Mobile-версия не показывает длинное полотно из трёх форм.

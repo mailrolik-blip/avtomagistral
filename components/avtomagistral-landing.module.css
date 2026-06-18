@@ -597,7 +597,8 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.85fr);
+  align-items: stretch;
   gap: 22px;
 }
 
@@ -608,16 +609,8 @@
   backdrop-filter: blur(18px);
 }
 
-.formArea:first-child {
+.formArea {
   border-radius: 34px 8px 8px 34px;
-}
-
-.formArea:nth-child(2) {
-  border-radius: 8px;
-}
-
-.formArea:last-child {
-  border-radius: 8px 34px 34px 8px;
 }
 
 .formTopline {
@@ -652,6 +645,52 @@
 .formArea > p {
   margin: 0 0 26px;
   color: var(--muted);
+}
+
+.secondaryCards {
+  display: grid;
+  gap: 22px;
+}
+
+.ctaCard {
+  display: flex;
+  min-height: 230px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid rgba(246, 243, 237, 0.18);
+  border-radius: 8px 34px 34px 8px;
+  background: rgba(8, 8, 8, 0.56);
+  padding: 30px;
+  backdrop-filter: blur(18px);
+}
+
+.ctaCard:first-child {
+  border-radius: 8px 34px 8px 8px;
+}
+
+.ctaCard:last-child {
+  border-radius: 8px 8px 34px 8px;
+}
+
+.ctaCard h3 {
+  margin: 0 0 14px;
+  color: var(--white);
+  font-size: clamp(24px, 2.2vw, 34px);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.ctaCard p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.ctaCard .btn {
+  width: 100%;
+  min-height: 52px;
+  white-space: normal;
 }
 
 .form {
@@ -721,6 +760,58 @@
   border-color: rgba(248, 113, 113, 0.45);
   background: rgba(248, 113, 113, 0.12);
   color: #fecaca;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.74);
+  padding: 24px;
+}
+
+.modal {
+  position: relative;
+  width: min(560px, 100%);
+  border: 1px solid rgba(246, 243, 237, 0.2);
+  border-radius: 24px;
+  background: #0b0b0b;
+  padding: 32px;
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.45);
+}
+
+.modal h3 {
+  margin: 0 0 14px;
+  color: var(--white);
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  text-transform: uppercase;
+}
+
+.modal p {
+  margin: 0 0 24px;
+  color: var(--muted);
+}
+
+.modalClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(246, 243, 237, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--white);
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
 }
 
 .honeypot {
@@ -815,9 +906,10 @@
     border-bottom: 1px solid rgba(0, 0, 0, 0.14);
   }
 
-  .formArea:first-child,
-  .formArea:nth-child(2),
-  .formArea:last-child {
+  .formArea,
+  .ctaCard,
+  .ctaCard:first-child,
+  .ctaCard:last-child {
     border-radius: 28px;
   }
 
@@ -918,6 +1010,23 @@
 
   .formArea {
     padding: 24px;
+  }
+
+  .ctaCard {
+    min-height: auto;
+    padding: 24px;
+  }
+
+  .modalOverlay {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .modal {
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    border-radius: 22px;
+    padding: 26px 20px 20px;
   }
 
   .footerGrid {

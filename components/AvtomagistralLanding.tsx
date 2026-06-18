@@ -1,16 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import { type CSSProperties, FormEvent, useState } from 'react';
+import { type CSSProperties, FormEvent, useEffect, useState } from 'react';
 
 import styles from './avtomagistral-landing.module.css';
 
 type FormStatus = 'idle' | 'sending' | 'success' | 'error';
-
-type LeadFormProps = {
-  kind: 'order' | 'partner' | 'callback';
-};
-
+type LeadKind = 'order' | 'cooperation' | 'callback';
+type ModalKind = Exclude<LeadKind, 'order'> | null;
 type LandingImageKey = 'hero' | 'freight' | 'equipment' | 'materials' | 'about';
 
 const landingImages: Record<LandingImageKey, string> = {
@@ -43,20 +40,17 @@ const serviceOptions = [
   'Другое',
 ];
 
-const workFormatOptions = ['ИП', 'ООО', 'Самозанятый', 'Частное лицо'];
-
 function imageStyle(image: string) {
   return { '--am-bg-image': `url("${image}")` } as CSSProperties;
 }
 
-function LeadForm({ kind }: LeadFormProps) {
+function LeadForm({ kind, onSuccess }: { kind: LeadKind; onSuccess?: () => void }) {
   const [status, setStatus] = useState<FormStatus>('idle');
   const [message, setMessage] = useState('');
 
   const isOrder = kind === 'order';
-  const isPartner = kind === 'partner';
-  const isCallback = kind === 'callback';
-  const formType = isOrder ? 'заказ техники / перевозки' : isPartner ? 'сотрудничество' : 'обратный звонок';
+  const isCooperation = kind === 'cooperation';
+  const submitText = kind === 'callback' ? 'Заказать обратный звонок' : 'Отправить заявку';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,15 +58,12 @@ function LeadForm({ kind }: LeadFormProps) {
     const form = event.currentTarget;
     const data = new FormData(form);
     const payload = {
-      formType,
+      formType: kind,
       name: String(data.get('name') || '').trim(),
       phone: String(data.get('phone') || '').trim(),
       service: String(data.get('service') || '').trim(),
       address: String(data.get('address') || '').trim(),
       region: String(data.get('region') || '').trim(),
-      equipment: String(data.get('equipment') || '').trim(),
-      quantity: String(data.get('quantity') || '').trim(),
-      workFormat: String(data.get('workFormat') || '').trim(),
       comment: String(data.get('comment') || '').trim(),
       companyWebsite: String(data.get('companyWebsite') || '').trim(),
       source: 'avtomagistral-landing',
@@ -80,9 +71,15 @@ function LeadForm({ kind }: LeadFormProps) {
       createdAt: new Date().toISOString(),
     };
 
-    if (!payload.name || !payload.phone || !payload.formType) {
+    if (!payload.name || !payload.phone) {
       setStatus('error');
       setMessage('Заполните имя и телефон, чтобы отправить заявку.');
+      return;
+    }
+
+    if (isOrder && !payload.service && !payload.comment) {
+      setStatus('error');
+      setMessage('Укажите, что нужно: технику, перевозку или задачу в комментарии.');
       return;
     }
 
@@ -97,16 +94,16 @@ function LeadForm({ kind }: LeadFormProps) {
       });
 
       if (!response.ok) {
-        const result = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(result?.error || 'Не удалось отправить заявку.');
+        throw new Error('Submit failed');
       }
 
       form.reset();
       setStatus('success');
-      setMessage('Заявка отправлена. Мы свяжемся с вами для уточнения деталей.');
+      setMessage('Заявка отправлена');
+      onSuccess?.();
     } catch {
       setStatus('error');
-      setMessage(`Не удалось отправить заявку. Попробуйте еще раз или позвоните по телефону ${brand.phone}.`);
+      setMessage(`Не удалось отправить заявку. Попробуйте ещё раз или позвоните нам: ${brand.phone}.`);
     }
   }
 
@@ -136,54 +133,29 @@ function LeadForm({ kind }: LeadFormProps) {
             <input type="text" name="address" placeholder="Город / адрес объекта" />
           </label>
           <label className={styles.field}>
-            <textarea
-              name="comment"
-              placeholder="Комментарий: что нужно перевезти, какая техника нужна, сроки, объем работ"
-            />
+            <textarea name="comment" placeholder="Комментарий: что нужно перевезти, какая техника нужна, сроки, объём работ" />
           </label>
         </>
-      ) : isPartner ? (
+      ) : isCooperation ? (
         <>
           <label className={styles.field}>
-            <input type="text" name="region" placeholder="Город / регион работы" />
+            <input type="text" name="region" placeholder="Город" />
           </label>
           <label className={styles.field}>
-            <input type="text" name="equipment" placeholder="Какая техника или транспорт есть?" />
-          </label>
-          <div className={styles.formRow}>
-            <label className={styles.field}>
-              <input type="text" name="quantity" placeholder="Количество единиц" />
-            </label>
-            <label className={styles.field}>
-              <select name="workFormat" defaultValue="">
-                <option value="">Форма работы</option>
-                {workFormatOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className={styles.field}>
-            <textarea name="comment" placeholder="Комментарий: условия, свободная техника, формат сотрудничества" />
+            <textarea name="comment" placeholder="Что предлагаете / комментарий" />
           </label>
         </>
       ) : (
         <label className={styles.field}>
-          <textarea name="comment" placeholder="Когда удобно перезвонить и какой вопрос нужно обсудить" />
+          <textarea name="comment" placeholder="Удобное время / комментарий" />
         </label>
       )}
 
       <button className={`${styles.btn} ${styles.btnGold}`} type="submit" disabled={status === 'sending'}>
-        {status === 'sending' ? 'Отправка...' : isCallback ? 'Заказать обратный звонок' : 'Отправить заявку'}
-        <span aria-hidden="true">→</span>
+        {status === 'sending' ? 'Отправка...' : submitText}
+        <span aria-hidden="true">-&gt;</span>
       </button>
-      <div className={styles.privacy}>
-        {isCallback
-          ? 'Оставьте телефон - мы перезвоним, чтобы уточнить детали.'
-          : isOrder
-          ? 'Нажимая кнопку, вы соглашаетесь на обработку персональных данных.'
-          : 'Мы свяжемся с вами для обсуждения условий сотрудничества.'}
-      </div>
+      <div className={styles.privacy}>Нажимая кнопку, вы соглашаетесь на обработку персональных данных.</div>
       {message ? (
         <div className={status === 'success' ? styles.success : styles.error} role="status">
           {message}
@@ -193,7 +165,45 @@ function LeadForm({ kind }: LeadFormProps) {
   );
 }
 
+function LeadModal({ kind, onClose }: { kind: Exclude<LeadKind, 'order'>; onClose: () => void }) {
+  const title = kind === 'cooperation' ? 'Предложить сотрудничество' : 'Заказать обратный звонок';
+  const text =
+    kind === 'cooperation'
+      ? 'Оставьте контакты и коротко опишите, какую технику, транспорт или формат работы предлагаете.'
+      : 'Оставьте имя, телефон и удобное время для звонка.';
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className={styles.modalOverlay} role="presentation" onMouseDown={onClose}>
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
+        <button className={styles.modalClose} type="button" aria-label="Закрыть" onClick={onClose}>
+          ×
+        </button>
+        <div className={styles.formTopline}>
+          <span>{title}</span>
+          <span aria-hidden="true">{kind === 'cooperation' ? '◇' : '☎'}</span>
+        </div>
+        <h3>{title}</h3>
+        <p>{text}</p>
+        <LeadForm kind={kind} />
+      </div>
+    </div>
+  );
+}
+
 export function AvtomagistralLanding() {
+  const [modal, setModal] = useState<ModalKind>(null);
+
   return (
     <div className={styles.shell}>
       <header className={styles.siteHeader}>
@@ -212,7 +222,6 @@ export function AvtomagistralLanding() {
             <a href="#about">О компании</a>
             <a href="#process">Как работаем</a>
             <a href="#request">Заявка</a>
-            <a href="#partner">Сотрудничество</a>
           </nav>
           <a className={styles.phoneTop} href={brand.phoneHref}>
             <span aria-hidden="true">☎</span>
@@ -231,16 +240,15 @@ export function AvtomagistralLanding() {
               <div className={styles.eyebrow}>{brand.short}</div>
               <h1>Грузоперевозки и услуги спецтехники</h1>
               <p className={styles.heroLead}>
-                Оператор грузоперевозок и услуг спецтехники для бизнеса, строительных объектов, подрядчиков и
-                частных задач. Оставьте заявку - мы свяжемся с вами для уточнения деталей.
+                Оператор грузоперевозок и услуг спецтехники для бизнеса, строительных объектов, подрядчиков и частных задач. Оставьте заявку - мы свяжемся с вами для уточнения деталей.
               </p>
               <div className={styles.heroActions}>
                 <a className={`${styles.btn} ${styles.btnGold}`} href="#request">
-                  Оставить заявку <span aria-hidden="true">→</span>
+                  Оставить заявку <span aria-hidden="true">-&gt;</span>
                 </a>
-                <a className={`${styles.btn} ${styles.btnOutline}`} href="#partner">
-                  Предложить сотрудничество
-                </a>
+                <button className={`${styles.btn} ${styles.btnOutline}`} type="button" onClick={() => setModal('callback')}>
+                  Заказать звонок
+                </button>
               </div>
             </div>
             <aside className={styles.heroMeta}>
@@ -254,7 +262,7 @@ export function AvtomagistralLanding() {
               </div>
               <div className={styles.metaItem}>
                 <span>Направления</span>
-                <strong>Перевозки · спецтехника · партнерство</strong>
+                <strong>Перевозки · спецтехника · партнёрство</strong>
               </div>
             </aside>
           </div>
@@ -289,12 +297,10 @@ export function AvtomagistralLanding() {
             </div>
             <div>
               <p className={styles.leadLarge}>
-                {brand.short} - единая точка обращения для задач, где нужен транспорт, техника и понятная организация
-                работ.
+                {brand.short} - единая точка обращения для задач, где нужен транспорт, техника и понятная организация работ.
               </p>
               <p className={styles.introText}>
-                Клиенту не нужно разбираться в десятках карточек и калькуляторов. Он оставляет заявку, описывает
-                задачу, а компания связывается с ним и подбирает подходящее решение.
+                Клиенту не нужно разбираться в десятках карточек и калькуляторов. Он оставляет заявку, описывает задачу, а компания связывается с ним и подбирает подходящее решение.
               </p>
             </div>
           </div>
@@ -302,57 +308,33 @@ export function AvtomagistralLanding() {
 
         <section className={styles.servicesFlow} id="services">
           <article className={styles.serviceRow}>
-            <div
-              className={`${styles.servicePhoto} ${styles.photoFromVariable}`}
-              style={imageStyle(landingImages.freight)}
-              aria-label="Грузовой транспорт"
-            />
+            <div className={`${styles.servicePhoto} ${styles.photoFromVariable}`} style={imageStyle(landingImages.freight)} aria-label="Грузовой транспорт" />
             <ServiceCopy
               number="01"
               icon="▰"
               title="Грузоперевозки"
               text="Организация перевозки строительных, коммерческих и других грузов с подбором транспорта под задачу."
-              items={[
-                'перевозка грузов по городу и области;',
-                'доставка строительных и коммерческих материалов;',
-                'подбор транспорта под объем, вес и маршрут.',
-              ]}
+              items={['перевозка грузов по городу и области;', 'доставка строительных и коммерческих материалов;', 'подбор транспорта под объём, вес и маршрут.']}
             />
           </article>
           <article className={styles.serviceRow}>
             <ServiceCopy
               number="02"
-              icon="▲"
+              icon="▴"
               title="Услуги спецтехники"
               text="Подбор спецтехники для строительных, дорожных, земляных, погрузочных и демонтажных работ."
-              items={[
-                'техника под условия объекта;',
-                'работа с частными и корпоративными клиентами;',
-                'заявки на разовые и длительные задачи.',
-              ]}
+              items={['техника под условия объекта;', 'работа с частными и корпоративными клиентами;', 'заявки на разовые и длительные задачи.']}
             />
-            <div
-              className={`${styles.servicePhoto} ${styles.photoFromVariable}`}
-              style={imageStyle(landingImages.equipment)}
-              aria-label="Спецтехника на объекте"
-            />
+            <div className={`${styles.servicePhoto} ${styles.photoFromVariable}`} style={imageStyle(landingImages.equipment)} aria-label="Спецтехника на объекте" />
           </article>
           <article className={styles.serviceRow}>
-            <div
-              className={`${styles.servicePhoto} ${styles.photoFromVariable}`}
-              style={imageStyle(landingImages.materials)}
-              aria-label="Доставка материалов"
-            />
+            <div className={`${styles.servicePhoto} ${styles.photoFromVariable}`} style={imageStyle(landingImages.materials)} aria-label="Доставка материалов" />
             <ServiceCopy
               number="03"
               icon="◆"
               title="Материалы, грунт и объектные задачи"
               text="Доставка материалов, вывоз грунта и мусора, погрузочно-разгрузочные работы и сопутствующая логистика."
-              items={[
-                'доставка песка, щебня, грунта и материалов;',
-                'вывоз строительного мусора и грунта;',
-                'организация техники для работ на площадке.',
-              ]}
+              items={['доставка песка, щебня, грунта и материалов;', 'вывоз строительного мусора и грунта;', 'организация техники для работ на площадке.']}
             />
           </article>
         </section>
@@ -363,8 +345,7 @@ export function AvtomagistralLanding() {
               <div className={styles.sectionLabel}>О компании</div>
               <h2>{brand.legal}</h2>
               <p>
-                Компания работает как оператор: принимает заявки, уточняет задачу, помогает подобрать транспорт или
-                спецтехнику и организовать дальнейшее выполнение работ.
+                Компания работает как оператор: принимает заявки, уточняет задачу, помогает подобрать транспорт или спецтехнику и организовать дальнейшее выполнение работ.
               </p>
               <div className={styles.signature}>
                 <div>
@@ -385,9 +366,9 @@ export function AvtomagistralLanding() {
             <div className={styles.sectionLabel}>Как мы работаем</div>
             <h2>Простой путь от заявки до решения</h2>
             <div className={styles.processLine}>
-              <ProcessStep number="1" title="Оставляете заявку" text="Выбираете направление: перевозка, спецтехника или сотрудничество." />
-              <ProcessStep number="2" title="Уточняем детали" text="Связываемся с вами, уточняем адрес, сроки, груз, объем и условия." />
-              <ProcessStep number="3" title="Подбираем вариант" text="Предлагаем транспорт, технику или формат партнерства под задачу." />
+              <ProcessStep number="1" title="Оставляете заявку" text="Описываете задачу: перевозка, спецтехника, адрес объекта или сроки." />
+              <ProcessStep number="2" title="Уточняем детали" text="Связываемся с вами, уточняем адрес, сроки, груз, объём и условия." />
+              <ProcessStep number="3" title="Подбираем вариант" text="Предлагаем транспорт, технику или формат партнёрства под задачу." />
               <ProcessStep number="4" title="Согласовываем работу" text="Фиксируем условия и переходим к организации выполнения." />
             </div>
           </div>
@@ -397,41 +378,37 @@ export function AvtomagistralLanding() {
           <div className={styles.container}>
             <div className={styles.formsHead}>
               <div>
-                <div className={styles.sectionLabel}>Заявки</div>
-                <h2>Три формы для разных сценариев</h2>
+                <div className={styles.sectionLabel}>Заявка</div>
+                <h2>Заказ техники или перевозки</h2>
               </div>
               <p>
-                Заказ техники, сотрудничество и быстрый обратный звонок отправляются в единый API нового проекта.
+                Основная форма на странице - для заказа техники, транспорта и объектных работ. Сотрудничество и обратный звонок вынесены в короткие сценарии.
               </p>
             </div>
             <div className={styles.formsGrid}>
               <article className={styles.formArea}>
                 <div className={styles.formTopline}>
-                  <span>Заказ техники / перевозки</span>
+                  <span>Заявка на заказ техники / перевозки</span>
                   <span aria-hidden="true">▣</span>
                 </div>
-                <h3>Заявка на заказ техники</h3>
-                <p>Опишите задачу: перевозка, спецтехника, адрес объекта, сроки и объем работ.</p>
+                <h3>Опишите задачу</h3>
+                <p>Укажите, что нужно, город или адрес объекта и любые детали по срокам, объёму или типу техники.</p>
                 <LeadForm kind="order" />
               </article>
-              <article className={styles.formArea} id="partner">
-                <div className={styles.formTopline}>
-                  <span>Сотрудничество</span>
-                  <span aria-hidden="true">◇</span>
-                </div>
-                <h3>Заявка на сотрудничество</h3>
-                <p>Оставьте контакты, если хотите предложить транспорт, технику или партнерство.</p>
-                <LeadForm kind="partner" />
-              </article>
-              <article className={styles.formArea} id="callback">
-                <div className={styles.formTopline}>
-                  <span>Обратный звонок</span>
-                  <span aria-hidden="true">☎</span>
-                </div>
-                <h3>Заказать обратный звонок</h3>
-                <p>Оставьте имя и телефон - мы перезвоним и поможем определить следующий шаг.</p>
-                <LeadForm kind="callback" />
-              </article>
+              <div className={styles.secondaryCards}>
+                <CtaCard
+                  title="Сотрудничество"
+                  text="Предложите транспорт, спецтехнику или другой формат партнёрства."
+                  button="Предложить сотрудничество"
+                  onClick={() => setModal('cooperation')}
+                />
+                <CtaCard
+                  title="Обратный звонок"
+                  text="Оставьте контакты, если удобнее сначала обсудить задачу по телефону."
+                  button="Заказать обратный звонок"
+                  onClick={() => setModal('callback')}
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -461,12 +438,28 @@ export function AvtomagistralLanding() {
           </div>
           <div className={styles.footerAction}>
             <a className={`${styles.btn} ${styles.btnGold}`} href="#request">
-              Оставить заявку <span aria-hidden="true">→</span>
+              Оставить заявку <span aria-hidden="true">-&gt;</span>
             </a>
           </div>
         </div>
       </footer>
+
+      {modal ? <LeadModal kind={modal} onClose={() => setModal(null)} /> : null}
     </div>
+  );
+}
+
+function CtaCard({ title, text, button, onClick }: { title: string; text: string; button: string; onClick: () => void }) {
+  return (
+    <article className={styles.ctaCard}>
+      <div>
+        <h3>{title}</h3>
+        <p>{text}</p>
+      </div>
+      <button className={`${styles.btn} ${styles.btnOutline}`} type="button" onClick={onClick}>
+        {button}
+      </button>
+    </article>
   );
 }
 
